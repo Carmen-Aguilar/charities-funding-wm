@@ -1,0 +1,330 @@
+---
+title: "West Midlands' Grants"
+output:
+  html_document:
+    df_print: paged
+---
+
+The data used in this analysis came from the website: http://grantnav.threesixtygiving.org/. It contains the funding got by the West Midlands' institutions between 2008 and 2017. I did not include 2018, as it is not completed. 
+
+To get the information, I used the filters in the website to generate the dataset, but I did not use the CSV downloadable from the web due to a problem to read the document in my computer, which gave me more than a 1,000 rows empty. To solve it, I scraped the website to get a complete database.
+
+My dataset contains all the information about the amount each organisation received between those years, the awarded date, the funder, and the district. It does not include other information as the type of organisation or the type of fund. Nevertheless, 360Giving told me that those last fields are not mandatory, so there may be some organisations that don't provide it. I could also confirm that I got the main variables to analyse.
+
+<a href="https://github.com/Carmen-Aguilar/charities-funding-wm/blob/master/README.md">Here is the code</a> used for the scraping. After gathering it, I cleaned the results in OpenRefine to standardise the names in each organisation.
+
+# Importing data
+
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+grants <- read_excel("charities_clean_OK.xls")
+```
+
+```{r}
+sum(is.na(grants))
+class(grants$Amount)
+```
+
+```{r}
+grants %>% filter(Amount == "0")
+```
+
+As the dataset is about grants awarded, it was a bit confusing the fact of finding 0 values in the Amount column. In my conversation with 360Giving, I was told that in the case of "Wolfson Foundation" the information of the Amount is in the description. As, at the beginning, I had 75 rows with 0, I looked one by one to complete it. 
+
+I got a final 55 rows without information about the money. In the same conversation mentioned before, I was also told that zeros from Ministry of Transport may mean that the grant was not finally awarded.
+
+I, therefore, removed those 55 rows to avoid that non-recipients could influence the analysis. 
+
+```{r}
+grantsOK <- grants %>% filter(Amount != "0")
+```
+
+```{r}
+grantsOK$Year <- as.character(grantsOK$Year)
+class(grantsOK$Year)
+```
+
+
+# Questions
+
+## How many organisations have been granted over eight years? And how much?
+
+
+```{r}
+grantsOK %>% group_by(Year) %>% summarise(Total_amount = sum(Amount)) %>% mutate(difference = Total_amount - lag(Total_amount), percentage = difference/lag(Total_amount)*100)
+```
+
+```{r}
+grantsyearly <- grantsOK %>% group_by(Year) %>% summarise(Total_amount = sum(Amount)) %>% mutate(difference = Total_amount - lag(Total_amount), percentage = difference/lag(Total_amount)*100)
+```
+
+```{r}
+library(ggplot2)
+library(scales)
+library(plotly)
+line_amount <- ggplot(data=grantsyearly, aes(x=Year, y=Total_amount, group=1, text=paste("Year:", Year, "<br>", "Amount:", Total_amount,"<br>", "Variation from previous year:", round(percentage),"%"))) +
+  geom_line()+
+  geom_point() +
+  ylim(0,300000000) +
+  scale_y_continuous(labels = comma) + labs(x = "Years", y = "Pounds", title = "Evolution of the grants in the West Midlands") + theme_bw()
+ggplotly(line_amount, tooltip = c("text"))
+```
+
+
+```{r}
+2008
+(56017738-30395456)/30395456*100
+
+2012
+(56017738-266409281)/266409281*100
+```
+
+Evolution of the number of organisations:
+
+```{r}
+grantsOK %>% group_by(Year) %>% summarise(number_charities = length(Recipient))  %>% mutate(difference_number = number_charities - lag(number_charities), percentage_number = difference_number/lag(number_charities)*100)
+```
+
+
+```{r}
+grantsyearly_number <- grantsOK %>% group_by(Year) %>% summarise(number_charities = length(Recipient))  %>% mutate(difference_number = number_charities - lag(number_charities), percentage_number = difference_number/lag(number_charities)*100)
+```
+
+```{r}
+grantsyearly <- merge(grantsyearly, grantsyearly_number, by = "Year")
+```
+
+```{r}
+line_charities <- ggplot(data=grantsyearly, aes(x=Year, y=number_charities, group=1, text=paste("Year:", Year, "<br>", "Charities:", number_charities,"<br>", "Variation from previous year:", round(percentage_number),"%"))) +
+  geom_line()+
+  geom_point() + labs(x = "Years", y = "Number of charities", title = "Number of charities granted")+ylim(0,2200)
+ggplotly(line_charities, tooltip = c("text"))
+```
+
+
+```{r}
+(1701-1004)/1004*100
+(1701-2053)/2053*100
+```
+
+#### CONCLUSION 1
+
+The total amount awarded for the West Midlands in 2017 was at its lowest point since 2010. 
+
+In the last year, the regional funding dropped by 44%, and it slumped by 79% since 2012. However, compared to the beginning of the last ten years, the financial support in the region is 84% higher in 2017 than in 2008.
+
+Despite the financial crisis in 2008, the funding for charities in the West Midlands sharply rose between 2010 and 2012. 
+
+In 2011 charities received more than three times as the previous year. That increase went on in 2012, where the funding was doubled. However, after that cutting rise, the grants dropped by 50% in 2013, and it has been continuously decreasing since then, except in 2016.
+
+As for the number of charities, there are 69% more awarded charities than in 2008 in the West Midlands. The maximum number was reached in 2014, two years after the top in the funding. Since then, the number of charities awarded has been decreasing, except in 2017, although compared to 2014, there were 17% fewer charities granted in 2017. 
+
+## How is the money geographically distributed?
+
+Birmingham received the highest amount of money each year (46.6% of all the funding in 2017, for instance). 
+
+```{r}
+grantsOK %>% filter(Year == "2017") %>% group_by(District) %>% summarise(Total = sum(Amount)) %>% mutate(percentage = Total/sum(Total)*100) %>% arrange(desc(percentage))
+```
+However, Birmingham has also the greatest number of charities. To compare between towns, I calculated a "per organisation figure" for each district. But, given that the data is skewed, and there are outliers, I won't use the arithmetic mean. A better measure is the median, but it gives you the middle value, ignoring those extreme points which are also valuable to the final number. 
+
+After reading <a href="https://medium.com/@JLMC/understanding-three-simple-statistics-for-data-visualizations-2619dbb3677a"> this article</a>, I decided to use <strong>the geometric mean</strong> (to which we will refer as 'average' or 'mean' onwards). 
+
+```{r}
+# Comparison mean, median and geometric mean by district and year. I also add the IQR which is a better measure of spread than the standard deviation.
+grantsOK %>% group_by_at(vars(District, Year)) %>% summarise(mean = mean(Amount), median = median(Amount), geom_mean = exp(mean(log(Amount))), IQR = IQR(Amount))  %>% arrange(Year,desc(geom_mean))
+```
+
+
+```{r}
+library(reshape2)
+districts1 <- grantsOK %>% group_by_at(vars(District, Year)) %>% summarise(geom_mean = round(exp(mean(log(Amount)))))
+districts <- dcast(districts1, District ~ Year, value.var="geom_mean")
+districts1$District <- gsub("District", "", districts1$District)
+```
+
+
+
+```{r}
+line_each <- plot_ly(districts1, x = ~Year, y = ~geom_mean, color = ~District,hoverinfo="text", text = ~paste("District:",District,"<br>", "Year:", Year, "<br>","Amount:", geom_mean)) %>%
+  add_lines() %>%
+  layout(title = "Geom mean grant per organisatoin by district", yaxis=list(title="Pounds", range=c(0,45000)),showlegend = FALSE) 
+line_each <- ggplotly(line_each, hoverinfo="text") 
+
+highlight(line_each, "plotly_hover", off="plotly_doubleclick", persistent = TRUE, selectize = TRUE) 
+```
+
+
+```{r}
+#Explore the data. Geometric mean by town each year
+districts %>% mutate(Diff_17_16 = (`2017`-`2016`)/`2016`*100) %>% arrange(Diff_17_16)
+```
+
+Only three cities (10%) increased the funding awarded in 2017 compared to 2016. Tamworth got 97.6% more, Birmingham 22.6%, and Sandwell 1%. However 90% of the towns received less funding than in 2016. South Staffordshire lost almost 80%.
+
+```{r}
+grantsOK %>% filter(District == "Tamworth District") %>% arrange(desc(Amount))
+```
+
+
+
+```{r}
+gg <- ggplot(data = melt(districts), aes(x=variable, y=value)) + geom_boxplot(aes(fill=variable)) + labs(title = "Grants per year", x="Years", y="Grant in pounds") + coord_flip() + scale_y_continuous(labels = scales::comma) + theme(legend.position='none')
+ggplotly(gg)
+```
+
+
+
+#### CONCLUSION 2
+
+Except in 2016 and 2015, all the years present outliers, districts whose mean grant was 1.5 higher than the median value in the West Midlands. Especially relevants are 2010, 2012, 2013 and 2017; the years with the highest difference in the mean funding between the two districts which received the most.
+
+In 2010, the average funding received by Teamworth's charities doubling Newcastle-under-Lyme's ones. 
+In 2012, Worcester got twice as much funding as Stafford. 
+In 2013, Warwick and Reddit got 40% and 37% more funding than Stoke on Tent.
+In 2017, Teamworth got 68% more than Birmingham's charities. 
+
+The distribution of the funding per district was more spread in 2012, 2015 and 2016, while there was less variability in the mean grant by district (so, more equally distributed) in 2008, 2009, 2011, and 2013.
+
+```{r}
+#The higher the IQR the more spread the data is. The lower, the more cluster to the median. 
+districts1 %>% group_by(Year) %>% summarise(IQR = IQR(geom_mean)) %>% arrange(IQR)
+```
+
+
+## Distribution and evolution within each city
+
+Given that 2012 marked an inflection point (the highest total amount) and 2010 was the previous lowest point, I have taken 2008, 2010, and 2012 as the years to which compare with 2017 to see the evolution of the funding per city. 
+
+```{r}
+grantsOK %>% select(Year, District, Amount) %>% group_by_at(vars(Year,District)) %>% summarise(Total = sum(Amount)) %>% dcast(District ~ Year, value.var="Total") %>% mutate(percent_08_17 = ((`2017` - `2008`)/`2008`*100), percent_10_17 = ((`2017` - `2010`)/`2010`*100), percent_12_17 = ((`2017` - `2012`)/`2012`*100)) %>% arrange(desc(percent_10_17))
+```
+
+#### CONCLUSION 3
+
+Compared to 2010, the funding has increased in two thirds of the cities. However, compared to 2012, only four cities (Bromsgrove, Warwick, Lichfield, and Wolverhampton) received more in 2017 than five years before. 
+
+How the funding is distributed by city each year can be assessed looking at the table below. The higher the IQR, the more spread the money is (the more variability in the distribution). The lower that figure, the less variability, so the organisations may be receiving similar amounts. 
+
+
+```{r}
+grantsOK %>% group_by_at(vars(District, Year)) %>% summarise(IQR = IQR(Amount)) %>% arrange(desc(IQR))
+```
+
+
+## Who received the most?
+
+Here is the list with the organisations who received the most in each city by year. 
+
+```{r}
+grantsOK %>% group_by_at(vars(Year, District, Recipient)) %>% summarise(Total = sum(Amount)) %>% mutate(per=round(Total/sum(Total)*100, 2)) %>% filter(per == max(per)) %>% arrange(Year,desc(per))
+```
+
+
+And here the organisations that received the most in the West Midlands each year (without comparing within their city)
+
+```{r}
+grantsOK %>% filter(Year == "2008") %>% group_by(Recipient) %>% summarise(Total= sum(Amount)) %>% mutate(percentage_08 = Total/sum(Total)*100) %>% arrange(desc(percentage_08))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2009") %>% group_by(Recipient) %>% summarise(Total= sum(Amount)) %>% mutate(percentage_09 = Total/sum(Total)*100) %>% arrange(desc(percentage_09))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2010") %>% group_by(Recipient) %>% summarise(Total= sum(Amount)) %>% mutate(percentage_10 = Total/sum(Total)*100) %>% arrange(desc(percentage_10))
+```
+
+
+```{r}
+grantsOK %>% filter(Year == "2011") %>% group_by(Recipient) %>% summarise(Total= sum(Amount)) %>% mutate(percentage_11 = Total/sum(Total)*100, round(percentage_11, digits = 2)) %>% arrange(desc(percentage_11))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2012") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_12 = Total/sum(Total)*100) %>% arrange(desc(percentage_12))
+```
+```{r}
+grantsOK %>% filter(Year == "2013") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_13 = Total/sum(Total)*100) %>% arrange(desc(percentage_13))
+```
+```{r}
+grantsOK %>% filter(Year == "2014") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_14 = Total/sum(Total)*100) %>% arrange(desc(percentage_14))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2015") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_15 = Total/sum(Total)*100) %>% arrange(desc(percentage_15))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2016") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_16 = Total/sum(Total)*100) %>% arrange(desc(percentage_16))
+```
+
+```{r}
+grantsOK %>% filter(Year == "2017") %>% group_by(Recipient) %>% summarise(Total = sum(Amount)) %>% mutate(percentage_17 = Total/sum(Total)*100) %>% arrange(desc(percentage_17))
+```
+
+
+#### CONCLUSION 4
+
+It's expected that the funding tends to be concentrated in fewer organisations in small towns. However:
+
+- British Equestrian Federation concentrated more than 96% of the funding received in Warwick in 2009.
+- Ecorys UK in Birmingham got 82% of the funding allocated for Birmingham and almost 60% of the money distributed across the West Midlands' charities in 2011. 
+- Staffordshire County Council got 97% of the funding allocated for the 34 organisations city and Shropshire got 88% of the funding, despite counting with 88 organisations in 2012.
+- In 2013, Wolverhampton Voluntary Sector Council	received the	85.5% of the funding in the city and Brighter Futures Housing Association Limited	got	73.4% of the Stoke on Tent funding. 
+- In 2016 Wolverhampton City Council received	81.7% of the funding allocated for the city. 
+
+Throughout the years, the funding has been distributed among the organisations with few results of concentration in one single organisation. These cases are:
+- In 2011 Ecorys UK got almost 60% of all the annual funding for the region. 
+- In 2012 Birmingham City Council got 25% of all the West Midlands' funding.
+- In 2013 UK Athletics got 17% and BVSC received 13% of the WM funds. 
+- In 2017 England Athletics Limited got 12.7%
+
+## Who are the main funders?
+
+```{r}
+grantsOK %>% group_by(Funder) %>% summarise(Total = sum(Amount)) %>% mutate(percentage=round(Total/sum(Total)*100, 2)) %>% arrange(desc(percentage))
+```
+```{r}
+bar <- grantsOK %>% group_by(Funder) %>% summarise(Total = sum(Amount)) %>% mutate(percentage=round(Total/sum(Total)*100, 2)) %>% filter(percentage > 0.33) %>% arrange(desc(percentage))
+
+funder_chart <- ggplot(data=bar, aes(x=reorder(Funder, -percentage), y=percentage, text=paste("Funder:", Funder,"<br>", "Awarded:", percentage, "%"))) +
+    geom_bar(stat="identity") + labs(title="Main funders in the West Midlands 2008-2017", subtitle="Put the mouse over each bar to see the information", x="Funder", y="% of the total") + theme(axis.text.x=element_blank()) + annotate("text", x=11, y=41, label = "Put the mouse over the chart", size=3.5)
+
+ggplotly(funder_chart, tooltip = c("text")) 
+```
+
+
+```{r}
+grouped_bar <- grantsOK %>% group_by(Year, Funder) %>% summarise(Total = sum(Amount)) %>% mutate(per=round(Total/sum(Total)*100, 2)) %>% filter(per >3) %>% arrange(Year,desc(per))
+```
+
+```{r}
+# Grouped Bar Plot
+funders_group <- ggplot(grouped_bar, aes(x=Year, y=per, fill=factor(Funder), text=paste("Funder:", Funder,"<br>", "Year:", Year,"<br>", "Percentage", per, "%")))+
+  geom_col(position = "dodge")+
+  theme(legend.position="bottom", legend.text = element_text(size=7), legend.title = element_blank()) + labs(title="Main funders in the West Mindlands", x = "Years", y="Percentage") 
+ggplotly(funders_group, tooltip = c("text")) %>% layout(legend =list(orientation="h"))
+```
+
+
+```{r}
+write.csv(grantsyearly, "grantsyearly.csv")
+write.csv(districts, "line_each.csv")
+write.csv(grouped_bar, "grouped_bar.csv")
+maximum <- grantsOK %>% group_by_at(vars(Year, District, Recipient)) %>% summarise(Total = sum(Amount)) %>% mutate(per=round(Total/sum(Total)*100, 2)) %>% filter(per == max(per)) %>% arrange(Year,desc(per))
+write.csv(maximum, "maximum.csv")
+```
+
+
+#### CONCLUSION 5
+
+The Big Lottery, Sport of England, and the Department of Transport have been the main funders over the last ten years. However, the Department of Transport's figure is due to the 2012 funds, when the institution gave 80% of all the money awarded to the West Midlands' charities during this year. 
+
+
+<strong>Bibliography:</strong>
+
+McChesney, J. (2016) You should summarize data with the geometric mean, Medium, Dec 15. Available at: https://medium.com/@JLMC/understanding-three-simple-statistics-for-data-visualizations-2619dbb3677a [Accessed at 1st August]
+
+Yau, N. (2012) How to Visualize and Compare Distributions in R, Flowingdata, May 15. Available at: https://flowingdata.com/2012/05/15/how-to-visualize-and-compare-distributions/ [Accessed at 1st August]
