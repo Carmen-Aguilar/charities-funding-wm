@@ -47,6 +47,7 @@ The code used to scrape the website is:
 And here is the R Notebook where I explained the statiscal analysis and I went on more details about the findings: http://rpubs.com/Carmen_Aguilar/descriptive-statistics
 
 ## GET THE DATA
+[Beneficiaries in the West Midlands from 2008 and 2017](https://github.com/Carmen-Aguilar/charities-funding-wm/blob/master/charities_clean_OK.xls)
 
 ## VISUALISATION
 <ul>The lines chart showing the evolution of the total funidng, the beneficiaries and the financial support per city were done with Flourish, as well as the bar chart about the funders.</ul>
