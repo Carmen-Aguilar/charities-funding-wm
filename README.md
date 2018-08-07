@@ -3,6 +3,7 @@
 In August 8th I published this story in Birmingham Eastside: 
 
 The code used to scrape the website is:
+
     #!/usr/bin/env python
     import scraperwiki
     import requests
