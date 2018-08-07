@@ -1,6 +1,6 @@
-# Grants for West Midlands' charities at its lowest level since 2011
+# Grants for West Midlands at its lowest level since 2010
 
-In XX I publish...
+In August 8th I published this story in Birmingham Eastside: 
 
 The code used to scrape the website is:
     #!/usr/bin/env python
@@ -44,3 +44,10 @@ The code used to scrape the website is:
 
          scraperwiki.sql.save(['index'], dataset)
 
+And here is the R Notebook where I explained the statiscal analysis and I went on more details about the findings: http://rpubs.com/Carmen_Aguilar/descriptive-statistics
+
+## GET THE DATA
+
+## VISUALISATION
+<ul>The lines chart showing the evolution of the total funidng, the beneficiaries and the financial support per city were done with Flourish, as well as the bar chart about the funders.</ul>
+<ul>The searchable table showing the highest beneficiary per city and per year was done with Datawrapper.</ul>
